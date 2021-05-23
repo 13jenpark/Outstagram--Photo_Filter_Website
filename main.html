@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webstagram</title>
+    <link href="style/common.css" rel="stylesheet" type="text/css" />
+    <link href="style/main.css" rel="stylesheet" type="text/css" />
+    <!-- favicon -->
+    <link rel="icon" href="img/favicon.png">
+    <link rel="instagram-icon" href="img/favicon.png">
+
+    <script>
+    
+        // sessionStorage에 login에서 입력 받은 값 출력
+        var name;
+
+      function printName(){
+        name = sessionStorage.getItem("0");
+        document.getElementById("userID").value = name;
+        document.getElementById("userID2").value = name;
+        
+      }
+
+      // ************************* 사진 불러오기 / 필터 효과 ************************* //
+      // 전역 변수(*중요*)
+        var outCanvas, outCtx, inFile;  // 입력 캔버스 관련
+        var inPaper, outPaper; // 캔버스에는 한점한점이 안찍힘. 대신 캔버스에 종이를 붙임.
+
+        var inImageArray, outImageArray;  // 입력 파일 및 배열
+        var inWidth, inHeight, outWidth, outHeight;  // 입력 영상의 폭과 높이
+        
+        function init() {
+            outCanvas = document.getElementById('outCanvas');
+            outCtx = outCanvas.getContext('2d');
+        }
+
+        //***********공통 사용 함수**********//
+        function openImage() {
+            inFile = document.getElementById('selectFile').files[0];
+            //그림 파일 >> 이미지 객체로 불러오기
+            var inImage = new Image(); //빈 이미지 객체 생성
+            inImage.src = inFile.name;
+
+            inImage.onload = function(){
+                //입력 파일의 크기를 알아냄
+                inWidth = inImage.width;
+                inHeight = inImage.height;
+
+                // 캔버스 크기를 결정
+                outCanvas.width = inWidth;
+                outCanvas.height = inHeight;
+                outCtx.drawImage(inImage, 0, 0, inWidth, inHeight);
+
+                // 입력 3차원 배열을 준비
+                inImageArray = new Array(3); // 3장짜리 배열 (r, g, b)
+                 for(var i=0; i<3; i++) {//1.총 3장만들기 위해서 3번 반복
+                    inImageArray[i] = new Array(inHeight); //2. 1장마다 2차원 배열 생성
+                    for(var k=0; k<inHeight; k++){
+                        inImageArray[i][k]=new Array(inWidth);
+                    }
+                }
+
+                //출력된 캔버스에서 픽셀값 뽑아내기
+                var imageData = outCtx.getImageData(0, 0, inWidth, inHeight);
+                var pixel_image = imageData.data;
+                var R, G, B;
+                for(var i=0; i<inHeight; i++){
+                    for(var k=0; k<inWidth; k++){
+                        px = (i*inWidth + k) * 4; //1픽셀 = 4byte(r,g,b,alpha값까지 포함) //순서는 0,4,8~~
+                        R = imageData.data[px+0];
+                        G = imageData.data[px+1];
+                        B = imageData.data[px+2];
+                        // Alpha = imageData.data[px+3]; //알파값(투명도)까지 한다면 추가하기
+                        
+                        inImageArray[0][i][k] = String.fromCharCode(R);
+                        inImageArray[1][i][k] = String.fromCharCode(G);
+                        inImageArray[2][i][k] = String.fromCharCode(B);
+                        
+                    }
+                }
+            }
+        }
+
+        // 캔버스에 출력
+        function displayImage() {
+              // 캔버스 크기를 결정
+            outCanvas.width = outWidth;
+            outCanvas.height = outHeight;
+            
+            var R, G, B;
+            outPaper = outCtx.createImageData(outWidth, outHeight); //종이 붙임
+
+            for(var i=0; i<outHeight; i++) {
+                for (var k=0; k<outWidth; k++) {
+                    R = outImageArray[0][i][k].charCodeAt(0); // Byte 문자를 숫자로.
+                    G = outImageArray[1][i][k].charCodeAt(0); // Byte 문자를 숫자로.
+                    B = outImageArray[2][i][k].charCodeAt(0); // Byte 문자를 숫자로.
+                    outPaper.data[(i*outWidth + k) * 4 + 0] = R;
+                    outPaper.data[(i*outWidth + k) * 4 + 1] = G;
+                    outPaper.data[(i*outWidth + k) * 4 + 2] = B;
+                    outPaper.data[(i*outWidth + k) * 4 + 3] = 255; // Alpha: 투명도 0%로 하기 위해서 255써야함
+                }
+            }
+            outCtx.putImageData(outPaper,0,0);
+        }
+
+        //************ 영상 처리 함수 모음 *************//
+        function equalImage(){
+                // (중요!) 출력 영상의 크기를 결정... 알고리즘에 따름.
+                outHeight = inHeight;
+                outWidth = inWidth;
+                // 출력 3차원 배열을 준비
+                outImageArray = new Array(3); // 3장짜리 배열 (r, g, b)
+                 for(var i=0; i<3; i++){ //1.총 3장만들기 위해서 3번 반복
+                    outImageArray[i] = new Array(outHeight); //2. 1장마다 2차원 배열 생성
+                    for(var k=0; k<outHeight; k++){
+                        outImageArray[i][k]=new Array(outWidth);
+                    }
+                }
+                
+                ///진짜 영상 알고리즘 부분
+                for(var rgb=0; rgb<3; rgb++){
+                    for(var i=0; i<inHeight; i++) {
+                        for (var k=0; k<inWidth; k++) {
+                            outImageArray[rgb][i][k] = inImageArray[rgb][i][k];
+                        }
+                    }
+                }
+            displayImage();
+        }
+
+        function addImage(){
+                // (중요!) 출력 영상의 크기를 결정... 알고리즘에 따름.
+                outHeight = inHeight;
+                outWidth = inWidth;
+                // 출력 3차원 배열을 준비
+                outImageArray = new Array(3); // 3장짜리 배열 (r, g, b)
+                 for(var i=0; i<3; i++){ //1.총 3장만들기 위해서 3번 반복
+                    outImageArray[i] = new Array(outHeight); //2. 1장마다 2차원 배열 생성
+                    for(var k=0; k<outHeight; k++){
+                        outImageArray[i][k]=new Array(outWidth);
+                    }
+                }
+                
+                ///진짜 영상 알고리즘 부분
+                var value = 80;
+
+                for(var rgb=0; rgb<3; rgb++){
+                    for(var i=0; i<inHeight; i++) {
+                        for (var k=0; k<inWidth; k++) {
+                            //문자를 숫자로
+                            pixel = inImageArray[rgb][i][k].charCodeAt(0);
+                            //핵심알고리즘
+                            if(pixel+value>255)
+                                pixel=255;
+                            if(pixel+value<0)
+                                pixel=0;
+                            else
+                                pixel +=value;
+                            //숫자를 문자로
+                            outImageArray[rgb][i][k] =String.fromCharCode(pixel);
+                        }
+                    }
+                }
+            displayImage();
+        }
+
+        function grayScaleImage(){
+                // (중요!) 출력 영상의 크기를 결정... 알고리즘에 따름.
+                outHeight = inHeight;
+                outWidth = inWidth;
+                // 출력 3차원 배열을 준비
+                outImageArray = new Array(3); // 3장짜리 배열 (r, g, b)
+                 for(var i=0; i<3; i++){ //1.총 3장만들기 위해서 3번 반복
+                    outImageArray[i] = new Array(outHeight); //2. 1장마다 2차원 배열 생성
+                    for(var k=0; k<outHeight; k++){
+                        outImageArray[i][k]=new Array(outWidth);
+                    }
+                }
+                
+                ///진짜 영상 알고리즘 부분
+                var R,G,B;
+                    for(var i=0; i<inHeight; i++) {
+                        for (var k=0; k<inWidth; k++) {
+                            R = inImageArray[0][i][k].charCodeAt(0);
+                            G = inImageArray[1][i][k].charCodeAt(0);
+                            B = inImageArray[2][i][k].charCodeAt(0);
+
+                            var RGB = parseInt((R+G+B)/ 3);
+
+                            outImageArray[0][i][k] = String.fromCharCode(RGB);
+                            outImageArray[1][i][k] = String.fromCharCode(RGB);
+                            outImageArray[2][i][k] = String.fromCharCode(RGB);
+
+                        }
+                    }
+            displayImage();
+        }
+
+        //흑백처리 함수
+        function bwImage() {  // 흑백 알고리즘
+            // (중요!) 출력 영상의 크기를 결정... 알고리즘에 따름.
+            outHeight = inHeight;
+            outWidth = inWidth;
+            // 출력 2차원 배열을 준비
+            outImageArray = new Array(3); // 3장짜리 배열 (r, g, b)
+                 for(var i=0; i<3; i++){ //1.총 3장만들기 위해서 3번 반복
+                    outImageArray[i] = new Array(outHeight); //2. 1장마다 2차원 배열 생성
+                    for(var k=0; k<outHeight; k++){
+                        outImageArray[i][k]=new Array(outWidth);
+                    }
+                }
+
+            // ***** 진짜 영상처리 알고리즘 *****
+            var value = 128;
+            var R, G, B;
+
+            for(var i=0; i<inHeight; i++) {
+                for (var k=0; k<inWidth; k++) {
+                    // 문자 --> 숫자
+                    R = inImageArray[0][i][k].charCodeAt(0);
+                    G = inImageArray[1][i][k].charCodeAt(0);
+                    B = inImageArray[2][i][k].charCodeAt(0);
+
+                    var RGB = parseInt((R+G+B) / 3);
+                    
+                    if (RGB > value)
+                        RGB = 255;
+                    else   
+                        RGB = 0;
+                    // 숫자 --> 문자
+                    outImageArray[0][i][k] = String.fromCharCode(RGB);
+                    outImageArray[1][i][k] = String.fromCharCode(RGB);
+                    outImageArray[2][i][k] = String.fromCharCode(RGB);
+                }
+            }
+          displayImage();
+        }
+        //포스터라이징
+        function posterizingImage() {
+            // (중요!) 출력 영상의 크기를 결정... 알고리즘에 따름.
+            outHeight = inHeight;
+            outWidth = inWidth;
+            // 출력 2차원 배열을 준비
+            outImageArray = new Array(3); // 3장짜리 배열 (r, g, b)
+                 for(var i=0; i<3; i++){ //1.총 3장만들기 위해서 3번 반복
+                    outImageArray[i] = new Array(outHeight); //2. 1장마다 2차원 배열 생성
+                    for(var k=0; k<outHeight; k++){
+                        outImageArray[i][k]=new Array(outWidth);
+                    }
+                }
+
+            // ***** 진짜 영상처리 알고리즘 *****
+            var R, G, B;
+            for(var i=0; i<inHeight; i++) {
+                for (var k=0; k<inWidth; k++) {
+                    // 문자 --> 숫자
+                    R = inImageArray[0][i][k].charCodeAt(0);
+                    if (R >= 231) {
+                        R = 255;
+                        } else if (R >= 206){
+                            R = 230;
+                        } else if (R >= 181){
+                            R = 205;
+                        } else if (R >= 156){
+                            R = 180;
+                        } else if (R >= 131){
+                            R = 155;
+                        } else if (R >= 106){
+                            R = 130;
+                        } else if (R >= 81){
+                            R = 105;
+                        } else if (R >= 56){
+                            R = 80;
+                        } else if (R >= 31){
+                            R = 55;
+                        }else R = 0;
+                    G = inImageArray[1][i][k].charCodeAt(0);
+                    if (G >= 231) {
+                        G = 255;
+                        } else if (G >= 206){
+                            G = 230;
+                        } else if (G >= 181){
+                            G = 205;
+                        } else if (G >= 156){
+                            G = 180;
+                        } else if (G >= 131){
+                            G = 155;
+                        } else if (G >= 106){
+                            R = 130;
+                        } else if (G >= 81){
+                            G = 105;
+                        } else if (G >= 56){
+                            G = 80;
+                        } else if (G >= 31){
+                            G = 55;
+                        }else G = 0;
+                    B = inImageArray[2][i][k].charCodeAt(0);
+                        if (B >= 231) {
+                            B = 255;
+                        } else if (B >= 206){
+                            B = 230;
+                        } else if (B >= 181){
+                            B = 205;
+                        } else if (B >= 156){
+                            B = 180;
+                        } else if (B >= 131){
+                            B = 155;
+                        } else if (B >= 106){
+                            B = 130;
+                        } else if (B >= 81){
+                            B = 105;
+                        } else if (B >= 56){
+                            B = 80;
+                        } else if (B >= 31){
+                            B = 55;
+                        }else B = 0;
+                        // 숫자 --> 문자
+                    outImageArray[0][i][k] = String.fromCharCode(R);
+                    outImageArray[1][i][k] = String.fromCharCode(G);
+                    outImageArray[2][i][k] = String.fromCharCode(B);
+                }
+            }
+            displayImage();
+        }
+
+        //반전
+        function revImage(){
+            // (중요!) 출력 영상의 크기를 결정... 알고리즘에 따름.
+            outHeight = inHeight;
+            outWidth = inWidth;
+            // 출력 2차원 배열을 준비
+            outImageArray = new Array(3); // 3장짜리 배열 (r, g, b)
+                 for(var i=0; i<3; i++){ //1.총 3장만들기 위해서 3번 반복
+                    outImageArray[i] = new Array(outHeight); //2. 1장마다 2차원 배열 생성
+                    for(var k=0; k<outHeight; k++){
+                        outImageArray[i][k]=new Array(outWidth);
+                    }
+                }
+            
+            // ***** 진짜 영상처리 알고리즘 *****
+            var R,G,B;
+            for(var i=0; i<inHeight; i++) {
+                for (var k=0; k<inWidth; k++) {
+                    
+                        R = inImageArray[0][i][k].charCodeAt(0);
+                        G = inImageArray[1][i][k].charCodeAt(0);
+                        B = inImageArray[2][i][k].charCodeAt(0);
+
+                        R = 255 - R;
+                        G = 255 - G;
+                        B = 255 - B;
+                    
+                        outImageArray[0][i][k] = String.fromCharCode(R);
+                        outImageArray[1][i][k] = String.fromCharCode(G);
+                        outImageArray[2][i][k] = String.fromCharCode(B);
+                    
+
+                }
+            }
+            displayImage();
+        }
+
+        //함수에서 리턴값은 하나밖에 못함
+        function rgb2hsv(r, g, b) {
+            var max = Math.max(r, g, b), min = Math.min(r, g, b),
+                d = max - min,
+                h,
+                s = (max === 0 ? 0 : d / max),
+                v = max / 255;
+
+            switch (max) {
+                case min: h = 0; break;
+                case r: h = (g - b) + d * (g < b ? 6: 0); h /= 6 * d; break;
+                case g: h = (b - r) + d * 2; h /= 6 * d; break;
+                case b: h = (r - g) + d * 4; h /= 6 * d; break;
+            }
+            return {
+                h: h,    s: s,    v: v
+            };
+        }
+
+        function hsv2rgb(h, s, v) {
+            var r, g, b, i, f, p, q, t;
+
+            h = h*360;  s = s*100;    v = v*100;
+
+            // Make sure our arguments stay in-range
+            h = Math.max(0, Math.min(360, h));
+            s = Math.max(0, Math.min(100, s));
+            v = Math.max(0, Math.min(100, v));
+            
+            h /= 360;   s /= 100;     v /= 100;
+
+            i = Math.floor(h * 6);
+            f = h * 6 - i;
+            p = v * (1 - s);
+            q = v * (1 - f * s);
+            t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v, g = t, b = p; break;
+                case 1: r = q, g = v, b = p; break;
+                case 2: r = p, g = v, b = t; break;
+                case 3: r = p, g = q, b = v; break;
+                case 4: r = t, g = p, b = v; break;
+                case 5: r = v, g = p, b = q; break;
+            }
+            return {
+                r: Math.round(r * 255),
+                g: Math.round(g * 255),
+                b: Math.round(b * 255)
+            };
+        }
+
+        function orangeImage(){
+           outHeight = inHeight;
+            outWidth = inWidth;
+            outImageArray = new Array(3); // 512짜리 1차원 배열
+            for (var i=0; i<3; i++) {
+                outImageArray[i] = new Array(outHeight); // 512짜리 1차원 배열
+                for(var k=0; k<outHeight; k++) 
+                    outImageArray[i][k] = new Array(outWidth);
+            }
+            
+            // ***** 영상처리 알고리즘 *****
+            var R,G,B;
+            for(var i=0; i<inHeight; i++) {
+                for (var k=0; k<inWidth; k++) {
+                    R = inImageArray[0][i][k].charCodeAt(0);
+                    G = inImageArray[1][i][k].charCodeAt(0);
+                    B = inImageArray[2][i][k].charCodeAt(0);
+
+                    var hsv = rgb2hsv (R, G, B)
+                    var H = hsv.h;
+                    var S = hsv.s;
+                    var V = hsv.v;
+                    
+                    if ( 8 < (H*360) && (H*360) < 30) {  // 오렌지 색
+                        S += 0.3;
+                        var hsv = rgb2hsv (R, G, B)
+                        var H = hsv.h;
+                        var S = hsv.s;
+                        var V = hsv.v;
+                        outImageArray[0][i][k] = String.fromCharCode(R);
+                        outImageArray[1][i][k] = String.fromCharCode(G);
+                        outImageArray[2][i][k] = String.fromCharCode(B);
+                    } else { // 오렌지 제외 나머지 색을 그레이 스케일로
+                        var RGB = parseInt( (R + G + B) / 3 );
+                        outImageArray[0][i][k] = String.fromCharCode(RGB);
+                        outImageArray[1][i][k] = String.fromCharCode(RGB);
+                        outImageArray[2][i][k] = String.fromCharCode(RGB);
+                    }
+
+                }
+            }
+            displayImage();
+        }
+
+        function blueImage(){
+           // (중요!) 출력 영상의 크기를 결정... 알고리즘에 따름.
+           outHeight = inHeight;
+            outWidth = inWidth;
+            // 출력 3차원 배열을 준비
+            outImageArray = new Array(3); // 512짜리 1차원 배열
+            for (var i=0; i<3; i++) {
+                outImageArray[i] = new Array(outHeight); // 512짜리 1차원 배열
+                for(var k=0; k<outHeight; k++) 
+                    outImageArray[i][k] = new Array(outWidth);
+            }
+            
+            // ***** 진짜 영상처리 알고리즘 *****
+            var R,G,B;
+            for(var i=0; i<inHeight; i++) {
+                for (var k=0; k<inWidth; k++) {
+                    R = inImageArray[0][i][k].charCodeAt(0);
+                    G = inImageArray[1][i][k].charCodeAt(0);
+                    B = inImageArray[2][i][k].charCodeAt(0);
+
+                    var hsv = rgb2hsv (R, G, B)
+                    var H = hsv.h;
+                    var S = hsv.s;
+                    var V = hsv.v;
+                    
+                    if ( 180< (H*360) && (H*360) < 240 ) {  // 블루 색
+                        S += 0.3;
+                        var hsv = rgb2hsv (R, G, B)
+                        var H = hsv.h;
+                        var S = hsv.s;
+                        var V = hsv.v;
+                        outImageArray[0][i][k] = String.fromCharCode(R);
+                        outImageArray[1][i][k] = String.fromCharCode(G);
+                        outImageArray[2][i][k] = String.fromCharCode(B);
+                    } else { // 나머지 색을 그레이 스케일로
+                        var RGB = parseInt( (R + G + B) / 3 );
+                        outImageArray[0][i][k] = String.fromCharCode(RGB);
+                        outImageArray[1][i][k] = String.fromCharCode(RGB);
+                        outImageArray[2][i][k] = String.fromCharCode(RGB);
+                    }
+
+                }
+            }
+            displayImage();
+        }
+    </script>
+  </head>
+  <body onload='init(); printName();'>
+    <!-- navigation -->
+    <nav>
+      <div class="nav-container">
+        <div class="nav-1">
+            <img class="logo_instagram_thin" src="img/logo_thin.png" alt="logo_thin">
+            <img class="straight" src="img/straight.png" alt="straight">
+            <img class="logo_instagram_txt" src="img/outstagram_logo2.png" alt="logo_text">
+        </div>
+        <input id="searchInput" type="search" class="input-search" placeholder="검색">
+        <div class="nav-2">
+          <img src="img/home.png" alt="홈">
+          <img src="img/nachimpan.png" alt="탐색">
+          <img src="img/heart.png" alt="좋아요">
+          <img src="img/person.png" alt="사람">
+        </div>
+      </div>
+    </nav>
+    <!-- main -->
+    <main>
+      <div class="feeds">
+        <!-- article -->
+        <article>
+          <header>
+            <div class="profile-of-article">
+              <img class="img-profile pic" src="img/profile.jpeg" alt="사용자 프로필 사진">
+              <span class="userID main-id point-span"><output id="userID"></output></span>
+            </div>
+            <img class="icon-react icon-more" src="img/dot3.jpg" alt="more">
+          </header>
+          <div class="main-image">
+         <!--   <img src="img/nachimpan.png" alt="dlwlrma님의 피드 사진" class="mainPic"> -->
+            <canvas id='outCanvas' style='background-color:rgba(255, 225, 230, 1)'></canvas>
+          </div>
+          <div class="icons-react">
+            <div class="icons-left">
+              <img class="icon-react" src="img/heart.png" alt="하트">
+              <img class="icon-react" src="img/talkballoon.png" alt="말풍선">
+              <img class="icon-react" src="img/dm.png" alt="DM">  
+            </div>
+            <img class="icon-react" src="img/bookmark.png" alt="북마크">
+          </div>
+          <!-- article text data -->
+          <div class="reaction">
+            <div class="liked-people">
+              <img class="pic" src="img/babogae.gif" alt="johnnyjsuh님의 프로필 사진">
+              <p><span class="point-span">qkqhro1004</span>님 <span class="point-span">외 2,412,751명</span>이 좋아합니다</p>
+            </div>
+            <div class="description">
+              <p><span class="point-span userID">idjucknungot</span><span class="at-tag">@dlwlrma @byunyohan</span> 🌱</p>
+            </div>
+            <div class="comment-section">
+              <ul class="comments">
+                <li>
+                  <span><span class="point-span userID">qkqhro1004</span>너무 멋있어요 😍😍</span>
+                  <img class="comment-heart" src="img/liked.png" alt="하트">
+                </li>
+                <!-- input 값 여기에 추가 -->
+              </ul>
+              <div class="time-log">
+                <span>32분 전</span>
+              </div>
+            </div>
+          </div>
+          <div class="hl"></div>
+          <div class="comment">
+            <input id="input-comment2" class="input-comment" type="text" placeholder="댓글 달기..." >
+            <button type="submit" class="submit-comment" disabled>게시</button>
+          </div>
+        </article>
+      </div>
+
+
+      <!-- main-right -->
+      <div class="main-right">
+        <div class="myProfile">
+          <img class="pic" src="img/profile.jpeg" alt="dlwlrma님의 프로필 사진">
+          <div>
+            <span class="userID point-span" ><output id="userID2"></output></span>
+            <span class="sub-span">내일은 발견하는 날이<br>아니라 만들어 가는 날이다.</span>  
+          </div>
+        </div>
+        <!-- story section -->
+        <div class="section-story">
+          <form>
+            <div class="filebox">
+              <label for="selectFile">업로드</label>
+              <input type='file' id='selectFile' onchange='openImage()'/>
+            </div>
+            <div class="buttonSlide">
+              <div>
+                <input type='button' id='photoEqual' value='원본' class="firstButton" onclick='equalImage()'/>
+              </div>
+              <div>
+              <input type='button' id='photoAdd' value='맑음' class="secondButton" onclick='addImage()'/>
+              </div>
+              <div>
+                <input type='button' id='photoGray' value='잿빛' class="threeButton" onclick='grayScaleImage()'/>
+              </div>
+              <div>
+                <input type='button' id='photoBW' value='흑백' class="fourButton" onclick='bwImage()'/>
+              </div>
+              <div>
+                <input type='button' id='photoBW' value='포스터라이징' class="fiveButton" onclick='posterizingImage()'/>
+              </div>
+              <div>
+                <input type='button' id='photoNomal' value='반전' class="sixButton" onclick='revImage()'/>
+              </div>
+              <div>
+                <input type='button' id='photoOrange' value='오렌지' class="sevenButton" onclick='orangeImage()'/>
+              </div>
+              <div>
+                <input type='button' id='photoBlue' value='파랑' class="eightButton" onclick='blueImage()'/>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+    
+  </body>
+</html>
